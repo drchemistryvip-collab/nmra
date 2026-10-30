@@ -1,0 +1,6 @@
+{
+  "name": "تۆمارا نمرەیان ب دەنگی و ئێکسل | Voice Gradebook AI",
+  "description": "تۆمارکرنا نمرەیێن قوتابیان ب دەنگی ب رێکا ژیرییا دەستکرد (AI) بۆ قۆناغ و هۆبەیا، دابەشکرنا نمرەیان ب ئێک کلیک و هەناردن وەک سجلا ئێکسل و چاپکرن.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
