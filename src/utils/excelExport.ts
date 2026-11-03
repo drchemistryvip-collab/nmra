@@ -259,6 +259,7 @@ export async function parseExcelFileToGrades(
       .replace(/[کك]/g, 'ك')
       .replace(/[ەة]/g, 'ه')
       .replace(/[أإآٱ]/g, 'ا')
+      .replace(/^\d+[\.\-\s]*/, '') // Remove leading numbers like "1.", "1-", "1 "
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();

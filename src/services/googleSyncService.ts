@@ -1,7 +1,13 @@
-/**
- * Google Sync Service for AI Studio
- * Handles Google OAuth Authentication, Google Drive JSON Backups, and Google Sheets Syncing.
- */
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  User, 
+  signOut as firebaseSignOut 
+} from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export interface GoogleUserProfile {
   email: string;
@@ -19,27 +25,38 @@ export interface SyncDataPayload {
   updatedAt: string;
 }
 
-const STORAGE_KEY_TOKEN = 'gdrive_oauth_token';
-const STORAGE_KEY_USER = 'gdrive_user_profile';
 const DRIVE_BACKUP_FILE_NAME = 'Gradebook_Backup_School_Data.json';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+// Scopes required for Drive and Sheets
+provider.addScope('https://www.googleapis.com/auth/drive.file');
+provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 
 class GoogleSyncService {
   private accessToken: string | null = null;
   private userProfile: GoogleUserProfile | null = null;
-  private tokenClient: any = null;
+  private isSigningIn = false;
 
   constructor() {
-    // Restore cached token and user profile if available
-    const savedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const savedUser = localStorage.getItem(STORAGE_KEY_USER);
-    if (savedToken) {
-      this.accessToken = savedToken;
-    }
-    if (savedUser) {
-      try {
-        this.userProfile = JSON.parse(savedUser);
-      } catch {}
-    }
+    // Listen for auth state changes to keep profile in sync
+    onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        this.userProfile = {
+          email: user.email || '',
+          name: user.displayName || user.email?.split('@')[0] || '',
+          picture: user.photoURL || undefined,
+        };
+      } else {
+        this.userProfile = null;
+        this.accessToken = null;
+      }
+    });
   }
 
   public getAccessToken(): string | null {
@@ -55,84 +72,48 @@ class GoogleSyncService {
   }
 
   /**
-   * Load Google Identity Services script dynamically
-   */
-  public async loadGisScript(): Promise<void> {
-    if ((window as any).google?.accounts?.oauth2) {
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google Identity Services SDK'));
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
-   * Prompt user to sign in with Google OAuth popup
+   * Prompt user to sign in with Google OAuth popup via Firebase
    */
   public async signIn(): Promise<GoogleUserProfile> {
-    await this.loadGisScript();
+    if (this.isSigningIn) {
+      throw new Error('کریارا چوونە ژوورێ یا یا دەستپێکری...');
+    }
 
-    return new Promise((resolve, reject) => {
-      try {
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: '398662027396-placeholder.apps.googleusercontent.com', // fallback handled gracefully
-          scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-          callback: async (response: any) => {
-            if (response.error) {
-              reject(new Error(response.error_description || response.error));
-              return;
-            }
-
-            this.accessToken = response.access_token;
-            localStorage.setItem(STORAGE_KEY_TOKEN, response.access_token);
-
-            try {
-              // Fetch user profile info using access token
-              const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                headers: { Authorization: `Bearer ${response.access_token}` },
-              });
-              
-              if (!userRes.ok) {
-                throw new Error('Failed to fetch Google profile');
-              }
-
-              const userData = await userRes.json();
-              this.userProfile = {
-                email: userData.email,
-                name: userData.name || userData.email.split('@')[0],
-                picture: userData.picture,
-              };
-
-              localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.userProfile));
-              resolve(this.userProfile);
-            } catch (err) {
-              reject(err);
-            }
-          },
-        });
-
-        client.requestAccessToken({ prompt: 'consent' });
-      } catch (err) {
-        reject(err);
+    try {
+      this.isSigningIn = true;
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      
+      if (!credential?.accessToken) {
+        throw new Error('نەگەهشتە کلیلا تێپەڕبوونێ (Access Token) ژ Google');
       }
-    });
+
+      this.accessToken = credential.accessToken;
+      this.userProfile = {
+        email: result.user.email || '',
+        name: result.user.displayName || result.user.email?.split('@')[0] || '',
+        picture: result.user.photoURL || undefined,
+      };
+
+      return this.userProfile;
+    } catch (err: any) {
+      console.error('Firebase Auth error:', err);
+      if (err.code === 'auth/popup-blocked') {
+        throw new Error('پەنجەرا چوونە ژوورێ هاتە بلۆک کرن. تکایە ڕێ بدە ب Popup د مۆبایلا خۆ دا.');
+      }
+      throw err;
+    } finally {
+      this.isSigningIn = false;
+    }
   }
 
   /**
-   * Sign out and clear stored tokens
+   * Sign out and clear cached tokens
    */
-  public signOut(): void {
+  public async signOut(): Promise<void> {
+    await firebaseSignOut(auth);
     this.accessToken = null;
     this.userProfile = null;
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_USER);
   }
 
   /**

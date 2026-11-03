@@ -25,7 +25,8 @@ interface ClassManagerModalProps {
   onDeleteStudent: (sectionId: string, studentId: string) => void;
   onBulkAddStudents: (sectionId: string, names: string[]) => void;
   onAddSection: (gradeId: string, label: string) => void;
-  onAddGrade: (name: string) => void;
+    onAddGrade: (name: string) => void;
+  onResetAllMarks: () => void;
   lang: Language;
 }
 
@@ -41,6 +42,7 @@ export const ClassManagerModal: React.FC<ClassManagerModalProps> = ({
   onBulkAddStudents,
   onAddSection,
   onAddGrade,
+  onResetAllMarks,
   lang,
 }) => {
   const t = (key: any, params?: any) => getTranslation(lang, key, params);
@@ -290,7 +292,19 @@ export const ClassManagerModal: React.FC<ClassManagerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <button
+            onClick={() => {
+              if (window.confirm('ئایا تو پشت ڕاستی ژ سفرکرنا هەمی نمرەیێن هەمی قۆناغ و هۆبەیان؟ ئەڤ کارە ناهێتە زڤڕاندن (تەنێ د سەلا زبڵێ دا دێ مینیت).')) {
+                onResetAllMarks();
+              }
+            }}
+            className="px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>سفرکرنا هەمی نمرەیان</span>
+          </button>
+          
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-all cursor-pointer"

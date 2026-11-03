@@ -66,12 +66,13 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY_INFO);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (!parsed.teacher || parsed.teacher.includes('شاكر')) {
+        // Ensure teacher name is always the requested one if it was Shaker or empty
+        if (!parsed.teacher || parsed.teacher.includes('شاكر') || parsed.teacher.includes('شاکر')) {
           parsed.teacher = 'هاریکار ژ لایێ خودایێ مەزن ڤە';
         }
         return parsed;
       }
-      return initialSchoolInfo;
+      return { ...initialSchoolInfo, teacher: 'هاریکار ژ لایێ خودایێ مەزن ڤە' };
     } catch {
       return initialSchoolInfo;
     }
@@ -802,6 +803,33 @@ export default function App() {
     showToast('هەمی نمرە هاتنە پاککرن و ناردن بۆ سەلا زبڵێ');
   };
 
+  // GLOBAL RESET: Clear all marks across all sections and all exams
+  const handleResetAllMarks = () => {
+    // 1. Create a massive trash snapshot for safety
+    const trashItem: ClearedRecordTrashItem = {
+      id: 'trash_full_reset_' + Date.now().toString(36),
+      timestamp: new Date().toISOString(),
+      title: 'پاقژکرنا گشتی (هەمی نمرە)',
+      type: 'g10_section', // reusing type for full restore logic
+      sectionId: 'all',
+      sectionName: 'هەمی هۆبە',
+      grade10RecordsSnapshot: grade10Records,
+      studentCount: Object.values(grade10Records).reduce((acc, sec) => acc + Object.keys(sec).length, 0),
+    };
+    setTrashItems((prev) => [trashItem, ...prev]);
+
+    // 2. Clear all Grade 10 marks (preserving notes if any, or just wipe)
+    setGrade10Records({});
+    
+    // 3. Clear all Single Exam marks
+    setExams((prev) => prev.map(ex => ({
+      ...ex,
+      grades: {}
+    })));
+
+    showToast('✓ هەمی نمرەیێن هەمی قۆناغ و هۆبەیان هاتنە سفرکرن');
+  };
+
   // Restore item from Trash Bin back to main register or exam sheet
   const handleRestoreTrashItem = (item: ClearedRecordTrashItem) => {
     if (item.type === 'g10_column' && item.columnKey && item.grade10RecordsSnapshot) {
@@ -1405,6 +1433,7 @@ export default function App() {
         onBulkAddStudents={handleBulkAddStudents}
         onAddSection={handleAddSection}
         onAddGrade={handleAddGrade}
+        onResetAllMarks={handleResetAllMarks}
         lang={lang}
       />
 

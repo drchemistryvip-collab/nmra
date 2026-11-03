@@ -62,8 +62,15 @@ export const GoogleSyncModal: React.FC<GoogleSyncModalProps> = ({
       });
     } catch (err: any) {
       console.error('Google Sign in error:', err);
+      let errorText = err.message || 'خەلەتیەک ڕوودا د چوونە ژوور دا ب هەژمارا Google';
+      
+      // Handle specific OAuth 403 error for testing mode
+      if (err.code === 'auth/access-denied' || (err.message && err.message.includes('403'))) {
+        errorText = 'ئەڤ هەژمارا تە (Gmail) د لیستا "Test Users" دا نینە. چونکە بەرنامە هێشتا یێ د قۆناغا تاقیکرنێ دا یە، تەنێ تو دشێی ب وێ هەژمارا (Gmail) بچی ژوور ئەوا تە پێ بەرنامە دروست کری (dr.chemistry.vip@gmail.com).';
+      }
+      
       setMessage({
-        text: err.message || 'خەلەتیەک ڕوودا د چوونە ژوور دا ب هەژمارا Google',
+        text: errorText,
         type: 'error',
       });
     } finally {
@@ -71,23 +78,30 @@ export const GoogleSyncModal: React.FC<GoogleSyncModalProps> = ({
     }
   };
 
-  const handleSignOut = () => {
-    googleSyncService.signOut();
-    setUser(null);
-    setMessage({
-      text: 'ژ هەژمارا Google دەرکەفتی.',
-      type: 'info',
-    });
+  const handleSignOut = async () => {
+    setLoading(true);
+    try {
+      await googleSyncService.signOut();
+      setUser(null);
+      setMessage({
+        text: 'ژ هەژمارا Google دەرکەفتی.',
+        type: 'info',
+      });
+    } catch (err: any) {
+      setMessage({ text: 'خەلەتیەک هەبوو د دەرکەفتنێ دا.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBackupToDrive = async () => {
-    if (!user) {
+    setMessage(null);
+    if (!googleSyncService.getAccessToken()) {
       await handleSignIn();
-      return;
+      if (!googleSyncService.getAccessToken()) return;
     }
 
     setLoading(true);
-    setMessage(null);
     try {
       const payload = getSyncPayload();
       const res = await googleSyncService.backupToDrive(payload);
@@ -110,13 +124,13 @@ export const GoogleSyncModal: React.FC<GoogleSyncModalProps> = ({
   };
 
   const handleRestoreFromDrive = async () => {
-    if (!user) {
+    setMessage(null);
+    if (!googleSyncService.getAccessToken()) {
       await handleSignIn();
-      return;
+      if (!googleSyncService.getAccessToken()) return;
     }
 
     setLoading(true);
-    setMessage(null);
     try {
       const payload = await googleSyncService.restoreFromDrive();
       if (!payload) {
@@ -143,13 +157,13 @@ export const GoogleSyncModal: React.FC<GoogleSyncModalProps> = ({
   };
 
   const handleExportToGoogleSheets = async () => {
-    if (!user) {
+    setMessage(null);
+    if (!googleSyncService.getAccessToken()) {
       await handleSignIn();
-      return;
+      if (!googleSyncService.getAccessToken()) return;
     }
 
     setLoading(true);
-    setMessage(null);
     try {
       const url = await onExportSheets();
       setMessage({
